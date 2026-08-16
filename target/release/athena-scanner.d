@@ -1,1 +1,0 @@
-/Users/acaldwell/athena-agents/target/release/athena-scanner: /Users/acaldwell/athena-agents/crates/athena-common/src/lib.rs /Users/acaldwell/athena-agents/crates/athena-scanner/src/lib.rs /Users/acaldwell/athena-agents/crates/athena-scanner/src/main.rs
