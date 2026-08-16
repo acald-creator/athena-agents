@@ -12,8 +12,9 @@
 # ---------------------------------------------------------------------------
 # Stage 1: rust-builder
 # Compile Rust binaries as statically-linked musl binaries
+# On alpine, the default target already links against musl.
 # ---------------------------------------------------------------------------
-FROM rust:1.78-alpine AS rust-builder
+FROM rust:1.85-alpine AS rust-builder
 
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 
@@ -29,11 +30,14 @@ COPY crates/athena-crafter/Cargo.toml crates/athena-crafter/Cargo.toml
 # Create dummy source files to seed the dependency cache
 RUN mkdir -p crates/athena-common/src && echo "// placeholder" > crates/athena-common/src/lib.rs \
     && mkdir -p crates/athena-scanner/src && echo "fn main() {}" > crates/athena-scanner/src/main.rs \
+    && echo "" > crates/athena-scanner/src/lib.rs \
     && mkdir -p crates/athena-fuzzer/src && echo "fn main() {}" > crates/athena-fuzzer/src/main.rs \
-    && mkdir -p crates/athena-crafter/src && echo "fn main() {}" > crates/athena-crafter/src/main.rs
+    && echo "" > crates/athena-fuzzer/src/lib.rs \
+    && mkdir -p crates/athena-crafter/src && echo "fn main() {}" > crates/athena-crafter/src/main.rs \
+    && echo "" > crates/athena-crafter/src/lib.rs
 
 # Build dependencies only (cache layer)
-RUN cargo build --release --target x86_64-unknown-linux-musl 2>/dev/null || true
+RUN cargo build --release || true
 
 # Copy real source code
 COPY crates/ crates/
@@ -41,11 +45,8 @@ COPY crates/ crates/
 # Touch source files to invalidate the dummy builds
 RUN find crates -name "*.rs" -exec touch {} +
 
-# Build release binaries (static musl)
-RUN cargo build --release --target x86_64-unknown-linux-musl \
-    && cp target/x86_64-unknown-linux-musl/release/athena-scanner /usr/local/bin/ 2>/dev/null || true \
-    && cp target/x86_64-unknown-linux-musl/release/athena-fuzzer /usr/local/bin/ 2>/dev/null || true \
-    && cp target/x86_64-unknown-linux-musl/release/athena-crafter /usr/local/bin/ 2>/dev/null || true
+# Build release binaries (statically linked on alpine/musl)
+RUN cargo build --release
 
 # ---------------------------------------------------------------------------
 # Stage 2: python-env
@@ -87,9 +88,9 @@ RUN groupadd --gid 1000 athena \
     && useradd --uid 1000 --gid 1000 --create-home --shell /bin/sh athena
 
 # Copy statically-linked Rust binaries from builder
-COPY --from=rust-builder /usr/local/bin/athena-scanner /usr/local/bin/
-COPY --from=rust-builder /usr/local/bin/athena-fuzzer /usr/local/bin/
-COPY --from=rust-builder /usr/local/bin/athena-crafter /usr/local/bin/
+COPY --from=rust-builder /app/target/release/athena-scanner /usr/local/bin/
+COPY --from=rust-builder /app/target/release/athena-fuzzer /usr/local/bin/
+COPY --from=rust-builder /app/target/release/athena-crafter /usr/local/bin/
 
 # Copy Python environment from python-env stage
 COPY --from=python-env /install /usr/local
