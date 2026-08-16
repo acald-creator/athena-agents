@@ -53,6 +53,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "athena-canbus"
+version = "0.1.0"
+dependencies = [
+ "athena-common",
+ "clap",
+ "libc",
+ "rand",
+ "rand_xoshiro",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "athena-common"
 version = "0.1.0"
 dependencies = [
@@ -71,6 +85,19 @@ dependencies = [
 
 [[package]]
 name = "athena-fuzzer"
+version = "0.1.0"
+dependencies = [
+ "athena-common",
+ "clap",
+ "rand",
+ "rand_xoshiro",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "athena-modbus"
 version = "0.1.0"
 dependencies = [
  "athena-common",

@@ -1,0 +1,24 @@
+[package]
+name = "athena-canbus"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "CAN Bus frame crafting and injection for Athena ICS offensive primitives"
+
+[[bin]]
+name = "athena-canbus"
+path = "src/main.rs"
+
+[dependencies]
+athena-common = { path = "../athena-common" }
+tokio = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+libc = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
