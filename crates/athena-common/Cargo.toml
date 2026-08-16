@@ -1,0 +1,14 @@
+[package]
+name = "athena-common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Shared types and JSON output formatting for Athena offensive primitives"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

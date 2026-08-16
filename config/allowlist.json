@@ -1,0 +1,4 @@
+[
+  {"host": "juice-shop.lab.local", "port_range": [3000, 3000], "protocol": "http", "label": "juice-shop-lab"},
+  {"host": "dvwa.lab.local", "port_range": [80, 80], "protocol": "http", "label": "dvwa-lab"}
+]

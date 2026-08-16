@@ -1,0 +1,23 @@
+[package]
+name = "athena-fuzzer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Deterministic protocol fuzzer for Athena offensive primitives"
+
+[[bin]]
+name = "athena-fuzzer"
+path = "src/main.rs"
+
+[dependencies]
+athena-common = { path = "../athena-common" }
+tokio = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -1,0 +1,21 @@
+[package]
+name = "athena-scanner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Async TCP port scanner for Athena offensive primitives"
+
+[[bin]]
+name = "athena-scanner"
+path = "src/main.rs"
+
+[dependencies]
+athena-common = { path = "../athena-common" }
+tokio = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

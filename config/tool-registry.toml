@@ -1,0 +1,58 @@
+# Tool Registry — maps tool identifiers to invocation commands, argument schemas,
+# and capability requirements. Loaded and validated at orchestrator startup.
+
+[tools.port-scanner]
+executable = "${ATHENA_BIN_DIR}/athena-scanner"
+invocation = "subprocess"
+required_capabilities = []
+description = "Async TCP port scanner"
+
+[tools.port-scanner.args]
+target = { type = "string", required = true }
+start_port = { type = "integer", required = true, min = 1, max = 65535 }
+end_port = { type = "integer", required = true, min = 1, max = 65535 }
+concurrency = { type = "integer", required = false, default = 1024, min = 1, max = 65535 }
+timeout_ms = { type = "integer", required = false, default = 3000, min = 100, max = 30000 }
+
+[tools.protocol-fuzzer]
+executable = "${ATHENA_BIN_DIR}/athena-fuzzer"
+invocation = "subprocess"
+required_capabilities = []
+description = "Deterministic protocol fuzzer"
+
+[tools.protocol-fuzzer.args]
+target = { type = "string", required = true }
+protocol = { type = "string", required = true, enum = ["http", "tcp", "dns"] }
+seed = { type = "integer", required = true, min = 0 }
+iterations = { type = "integer", required = false, default = 1000, min = 1, max = 1000000 }
+
+[tools.packet-crafter]
+executable = "${ATHENA_BIN_DIR}/athena-crafter"
+invocation = "subprocess"
+required_capabilities = ["NET_RAW"]
+description = "Raw packet crafter"
+
+[tools.packet-crafter.args]
+protocol = { type = "string", required = true, enum = ["tcp", "udp", "icmp"] }
+src_port = { type = "integer", required = true, min = 1, max = 65535 }
+dst_port = { type = "integer", required = true, min = 1, max = 65535 }
+payload = { type = "string", required = true }
+
+[tools.nmap-scan]
+executable = "/usr/bin/nmap"
+invocation = "subprocess"
+required_capabilities = []
+description = "Nmap network scanner"
+
+[tools.nmap-scan.args]
+target = { type = "string", required = true }
+flags = { type = "string", required = false, default = "-sT" }
+
+[tools.scapy-craft]
+module = "orchestrator.tools.scapy_craft"
+invocation = "in-process"
+required_capabilities = ["NET_RAW"]
+description = "Scapy packet construction (in-process)"
+
+[tools.scapy-craft.args]
+packet_spec = { type = "object", required = true }

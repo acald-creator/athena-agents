@@ -1,0 +1,15 @@
+# OWASP Juice Shop target environment definition
+# Intentionally vulnerable web application for security testing
+# Schema: host, port, protocol, base_path, timeout_seconds, vulnerabilities
+
+[target]
+id = "juice-shop"
+host = "juice-shop.lab.local"
+port = 3000
+protocol = "http"
+base_path = "/"
+timeout_seconds = 5
+
+[target.vulnerabilities]
+categories = ["injection", "broken-auth", "xss", "security-misconfiguration"]
+owasp_top_10 = ["A03:2021", "A07:2021", "A01:2021", "A05:2021"]

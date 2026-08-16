@@ -1,0 +1,19 @@
+[package]
+name = "athena-crafter"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Packet crafter for Athena offensive primitives"
+
+[[bin]]
+name = "athena-crafter"
+path = "src/main.rs"
+
+[dependencies]
+athena-common = { path = "../athena-common" }
+clap = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

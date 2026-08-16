@@ -1,0 +1,5 @@
+[backend]
+type = "ollama"  # ollama | vllm | llamacpp
+url = "http://localhost:11434"
+model = "llama3:8b"
+timeout_seconds = 10

@@ -1,0 +1,15 @@
+# Damn Vulnerable Web Application (DVWA) target environment definition
+# Intentionally vulnerable web application for security testing
+# Schema: host, port, protocol, base_path, timeout_seconds, vulnerabilities
+
+[target]
+id = "dvwa"
+host = "dvwa.lab.local"
+port = 80
+protocol = "http"
+base_path = "/"
+timeout_seconds = 5
+
+[target.vulnerabilities]
+categories = ["injection", "broken-auth", "xss", "file-upload", "command-injection"]
+owasp_top_10 = ["A03:2021", "A07:2021", "A01:2021", "A04:2021"]
