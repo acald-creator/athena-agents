@@ -1,0 +1,18 @@
+# GRFICSv2 Chemical Process Simulator target environment definition
+# Virtual ICS environment simulating a chemical process
+# Modbus TCP on port 502 with tight safety boundaries
+
+[target]
+id = "grfics"
+host = "grfics.lab.local"
+port = 502
+protocol = "modbus-tcp"
+ics_rate_limit = 5
+
+[target.safe_ranges]
+# Process control registers with strict safety limits
+0 = [0, 100]    # Reactor temperature setpoint (%)
+1 = [0, 100]    # Pressure valve position (%)
+
+[target.vulnerabilities]
+categories = ["process-manipulation", "sensor-spoofing", "dos"]

@@ -1,0 +1,19 @@
+# OpenPLC Modbus TCP target environment definition
+# Open-source PLC with Modbus TCP on port 502
+# Used for security testing against known register maps
+
+[target]
+id = "openplc"
+host = "openplc.lab.local"
+port = 502
+protocol = "modbus-tcp"
+ics_rate_limit = 10
+
+[target.safe_ranges]
+# Holding registers with safety boundaries
+100 = [0, 1000]    # Process variable output (scaled 0-1000)
+101 = [0, 500]     # Secondary output (scaled 0-500)
+200 = [0, 65535]   # Unrestricted test register
+
+[target.vulnerabilities]
+categories = ["default-credentials", "unauthenticated-access", "function-code-abuse"]

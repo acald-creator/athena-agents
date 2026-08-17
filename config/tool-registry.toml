@@ -56,3 +56,108 @@ description = "Scapy packet construction (in-process)"
 
 [tools.scapy-craft.args]
 packet_spec = { type = "object", required = true }
+
+# ---------------------------------------------------------------------------
+# ICS Tools — Modbus TCP
+# ---------------------------------------------------------------------------
+
+[tools.modbus-read]
+executable = "${ATHENA_BIN_DIR}/athena-modbus"
+invocation = "subprocess"
+required_capabilities = []
+description = "Modbus TCP register/coil reader"
+
+[tools.modbus-read.args]
+target = { type = "string", required = true }
+action = { type = "string", required = true, enum = ["read-coils", "read-discrete-inputs", "read-holding-registers", "read-input-registers"] }
+unit_id = { type = "integer", required = true, min = 1, max = 247 }
+address = { type = "integer", required = true, min = 0, max = 65535 }
+quantity = { type = "integer", required = true, min = 1, max = 125 }
+timeout_ms = { type = "integer", required = false, default = 5000, min = 500, max = 60000 }
+
+[tools.modbus-write]
+executable = "${ATHENA_BIN_DIR}/athena-modbus"
+invocation = "subprocess"
+required_capabilities = ["ICS_WRITE"]
+description = "Modbus TCP register/coil writer"
+
+[tools.modbus-write.args]
+target = { type = "string", required = true }
+action = { type = "string", required = true, enum = ["write-coil", "write-register", "write-multiple-coils", "write-multiple-registers"] }
+unit_id = { type = "integer", required = true, min = 1, max = 247 }
+address = { type = "integer", required = true, min = 0, max = 65535 }
+value = { type = "integer", required = false, min = 0, max = 65535 }
+timeout_ms = { type = "integer", required = false, default = 5000, min = 500, max = 60000 }
+
+[tools.modbus-fuzz]
+executable = "${ATHENA_BIN_DIR}/athena-modbus"
+invocation = "subprocess"
+required_capabilities = ["ICS_WRITE"]
+description = "Modbus TCP protocol fuzzer"
+
+[tools.modbus-fuzz.args]
+target = { type = "string", required = true }
+unit_id = { type = "integer", required = true, min = 1, max = 247 }
+seed = { type = "integer", required = true, min = 0 }
+iterations = { type = "integer", required = false, default = 1000, min = 1, max = 1000000 }
+timeout_ms = { type = "integer", required = false, default = 5000, min = 500, max = 60000 }
+
+[tools.modbus-enumerate]
+executable = "${ATHENA_BIN_DIR}/athena-modbus"
+invocation = "subprocess"
+required_capabilities = []
+description = "Modbus TCP unit ID enumerator"
+
+[tools.modbus-enumerate.args]
+target = { type = "string", required = true }
+timeout_ms = { type = "integer", required = false, default = 5000, min = 500, max = 60000 }
+
+# ---------------------------------------------------------------------------
+# ICS Tools — CAN Bus
+# ---------------------------------------------------------------------------
+
+[tools.canbus-craft]
+executable = "${ATHENA_BIN_DIR}/athena-canbus"
+invocation = "subprocess"
+required_capabilities = []
+description = "CAN frame crafter"
+
+[tools.canbus-craft.args]
+id = { type = "string", required = true }
+data = { type = "string", required = true }
+extended = { type = "string", required = false, default = "false" }
+
+[tools.canbus-inject]
+executable = "${ATHENA_BIN_DIR}/athena-canbus"
+invocation = "subprocess"
+required_capabilities = ["CAN_INJECT"]
+description = "CAN frame injector"
+
+[tools.canbus-inject.args]
+interface = { type = "string", required = true }
+id = { type = "string", required = true }
+data = { type = "string", required = true }
+extended = { type = "string", required = false, default = "false" }
+
+[tools.canbus-sniff]
+executable = "${ATHENA_BIN_DIR}/athena-canbus"
+invocation = "subprocess"
+required_capabilities = []
+description = "CAN bus frame sniffer"
+
+[tools.canbus-sniff.args]
+interface = { type = "string", required = true }
+duration_ms = { type = "integer", required = false, default = 10000, min = 1000, max = 300000 }
+
+[tools.canbus-fuzz]
+executable = "${ATHENA_BIN_DIR}/athena-canbus"
+invocation = "subprocess"
+required_capabilities = ["CAN_INJECT"]
+description = "CAN bus fuzzer"
+
+[tools.canbus-fuzz.args]
+interface = { type = "string", required = true }
+seed = { type = "integer", required = true, min = 0 }
+iterations = { type = "integer", required = false, default = 1000, min = 1, max = 1000000 }
+id_range_start = { type = "string", required = false, default = "0" }
+id_range_end = { type = "string", required = false, default = "7FF" }

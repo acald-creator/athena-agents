@@ -3,13 +3,18 @@
 //! This crate provides CAN frame validation, crafting, injection, sniffing,
 //! replay, and fuzzing operations over Linux virtual CAN (vcan) interfaces.
 //!
-//! # Modules (planned)
+//! # Modules
 //!
 //! - Frame validation and crafting (this file)
 //! - `socket` — SocketCAN raw socket wrapper
 //! - `sniff` — Frame capture with duration
 //! - `replay` — Timed replay from capture file
 //! - `fuzz` — Deterministic CAN fuzzer (xoshiro256++)
+
+pub mod fuzz;
+pub mod replay;
+pub mod sniff;
+pub mod socket;
 
 use athena_common::{CanCraftResult, CanIdType};
 
@@ -117,6 +122,40 @@ pub fn craft_frame(id: u32, extended: bool, data_hex: &str) -> Result<CanCraftRe
         id_type,
         dlc,
         data_hex: data_hex.to_lowercase(),
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Injection
+// ---------------------------------------------------------------------------
+
+/// Inject a single CAN frame onto the specified interface.
+///
+/// Validates the frame parameters, opens a SocketCAN socket, transmits
+/// the frame, and returns the injection result with timing information.
+///
+/// On non-Linux platforms this will return `CanSocketError::NotSupported`
+/// from `CanSocket::open`.
+pub fn inject_frame(
+    interface: &str,
+    id: u32,
+    extended: bool,
+    data_hex: &str,
+) -> Result<athena_common::CanInjectResult, socket::CanSocketError> {
+    validate_can_id(id, extended)
+        .map_err(|e| socket::CanSocketError::SendFailed(e))?;
+    let data = validate_data(data_hex)
+        .map_err(|e| socket::CanSocketError::SendFailed(e))?;
+
+    let frame = socket::RawCanFrame::new(id, extended, &data);
+    let sock = socket::CanSocket::open(interface)?;
+    let start = std::time::Instant::now();
+    sock.send_frame(&frame)?;
+
+    Ok(athena_common::CanInjectResult {
+        interface: interface.to_string(),
+        frame_count: 1,
+        elapsed_ms: start.elapsed().as_millis() as u64,
     })
 }
 
@@ -250,5 +289,45 @@ mod tests {
         let result = craft_frame(0x100, false, "ZZZZ");
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("invalid characters"));
+    }
+
+    // --- inject_frame tests ---
+
+    #[test]
+    fn test_inject_frame_invalid_id_returns_error() {
+        let result = inject_frame("vcan0", 0x800, false, "AABB");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            socket::CanSocketError::SendFailed(msg) => {
+                assert!(msg.contains("standard CAN ID"));
+            }
+            #[cfg(not(target_os = "linux"))]
+            socket::CanSocketError::NotSupported => {
+                // On non-Linux, validation happens first, so this
+                // should not occur — but handle gracefully.
+                panic!("expected SendFailed for invalid ID, got NotSupported");
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_inject_frame_invalid_data_returns_error() {
+        let result = inject_frame("vcan0", 0x100, false, "ZZZZ");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            socket::CanSocketError::SendFailed(msg) => {
+                assert!(msg.contains("invalid characters"));
+            }
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    #[test]
+    fn test_inject_frame_returns_not_supported_on_non_linux() {
+        // Valid parameters — should pass validation, then fail at socket open
+        let result = inject_frame("vcan0", 0x100, false, "AABB");
+        assert_eq!(result.unwrap_err(), socket::CanSocketError::NotSupported);
     }
 }

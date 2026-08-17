@@ -1,0 +1,16 @@
+# Virtual CAN Bus Lab target environment definition
+# Linux vcan interface for CAN security testing without physical hardware
+
+[target]
+id = "vcan-lab"
+host = ""
+port = 0
+protocol = "canbus"
+ics_rate_limit = 10
+
+[target.id_ranges]
+standard = [0, 2047]       # Full standard CAN ID range (0x000-0x7FF)
+extended = [0, 536870911]  # Full extended CAN ID range (0x00000000-0x1FFFFFFF)
+
+[target.vulnerabilities]
+categories = ["frame-injection", "replay-attack", "bus-flooding"]
