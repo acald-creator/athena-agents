@@ -155,7 +155,7 @@ async def run(args: argparse.Namespace) -> int:
 
     if backend_type == "ollama":
         from orchestrator.llm.ollama import OllamaBackend
-        llm_backend = OllamaBackend(base_url=ollama_host, model=model_name)
+        llm_backend = OllamaBackend(base_url=ollama_host, model=model_name, timeout=120.0)
     elif backend_type == "vllm":
         from orchestrator.llm.vllm import VLLMBackend
         llm_backend = VLLMBackend(base_url=ollama_host, model=model_name)

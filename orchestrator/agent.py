@@ -374,30 +374,69 @@ class AgentOrchestrator:
         )
 
     async def plan(self, state: TargetState, history: list[ReflectSummary]) -> ActionSpec:
-        """Select a technique and tool via LLM and Tool_Registry.
+        """Select a technique and tool via LLM and Tool_Registry."""
+        import json as json_mod
 
-        For now, returns a stub ActionSpec. Future implementations will
-        use the LLM backend to reason about available tools and decide
-        the next action based on target state and action history.
-
-        Args:
-            state: Current target state from the observe phase.
-            history: Action history from previous reflect phases.
-
-        Returns:
-            An ActionSpec describing the planned action.
-        """
-        # Stub: in production, this will call the LLM to select a tool
-        # and construct arguments based on the current state and history.
         available_tools = self.tool_registry.list_tools()
-        tool_id = available_tools[0] if available_tools else "noop"
+        filtered_tools = []
+        for tool_id in available_tools:
+            tool = self.tool_registry.get_tool(tool_id)
+            if tool and all(cap in self.active_capabilities for cap in tool.required_capabilities):
+                filtered_tools.append(tool_id)
+            elif tool and not tool.required_capabilities:
+                filtered_tools.append(tool_id)
 
-        return ActionSpec(
-            tool_id=tool_id,
-            arguments={},
-            technique=None,
-            rationale="Stub plan - LLM integration pending",
-        )
+        tool_descs = []
+        for tid in filtered_tools:
+            tool = self.tool_registry.get_tool(tid)
+            if tool:
+                args_desc = ", ".join(f"{k}: {v.type}" for k, v in tool.args.items())
+                tool_descs.append(f"- {tid}: {tool.description} (args: {args_desc})")
+
+        history_lines = [f"- {h.action_spec.tool_id}: {h.action_spec.rationale[:50]}" for h in history[-10:]]
+        nl = chr(10)
+
+        prompt = f"""You are an autonomous security testing agent. Target: {state.target}
+{nl}Available tools:
+{nl.join(tool_descs)}
+{nl}Target: host={state.target}, ports={state.open_ports}
+{nl}Previous actions ({len(history)} total):
+{nl.join(history_lines) if history_lines else '(first action)'}
+{nl}Select the next tool. Respond ONLY with JSON:
+{{"tool_id": "<tool>", "arguments": {{}}, "technique": "<ATT&CK ID or null>", "rationale": "<why>"}}
+{nl}Base URL: http://{state.target}:8090"""
+
+        try:
+            response = await self.llm_backend.generate(prompt, max_tokens=512)
+            clean = response.strip()
+            if clean.startswith("```"):
+                clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
+            if clean.endswith("```"):
+                clean = clean[:-3]
+            if clean.startswith("json"):
+                clean = clean[4:]
+            clean = clean.strip()
+            parsed = json_mod.loads(clean)
+            tool_id = parsed.get("tool_id", filtered_tools[0] if filtered_tools else "noop")
+            if tool_id not in filtered_tools:
+                logger.warning("LLM selected unavailable tool %s", tool_id)
+                tool_id = filtered_tools[0] if filtered_tools else "noop"
+            return ActionSpec(
+                tool_id=tool_id,
+                arguments=parsed.get("arguments", {}),
+                technique=parsed.get("technique"),
+                rationale=parsed.get("rationale", "LLM-planned"),
+            )
+        except Exception as e:
+            logger.warning("LLM plan failed: %s, fallback", e)
+            idx = len(history) % len(filtered_tools) if filtered_tools else 0
+            return ActionSpec(
+                tool_id=filtered_tools[idx] if filtered_tools else "noop",
+                arguments={},
+                technique=None,
+                rationale=f"Fallback ({e})",
+            )
+
 
     async def act(self, action_spec: ActionSpec) -> ActionResult:
         """Execute the planned action using the tool from the registry.
