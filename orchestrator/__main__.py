@@ -145,27 +145,36 @@ async def run(args: argparse.Namespace) -> int:
     from orchestrator.rate_limiter import RateLimiter
     from orchestrator.tool_registry import ToolRegistry
     from orchestrator.traffic_labeling import TrafficLabeler
-    from orchestrator.llm.interface import LLMBackend
-
+    
     # Build components
     tool_registry = ToolRegistry.load(tool_registry_path)
 
     # Select LLM backend
-    llm_backend = LLMBackend.create(
-        backend_type=llm_config.get("backend", {}).get("type", "ollama"),
-        url=ollama_host,
-        model=llm_config.get("backend", {}).get("model", "llama3:8b"),
-    )
+    backend_type = llm_config.get("backend", {}).get("type", "ollama")
+    model_name = llm_config.get("backend", {}).get("model", "llama3:8b")
+
+    if backend_type == "ollama":
+        from orchestrator.llm.ollama import OllamaBackend
+        llm_backend = OllamaBackend(base_url=ollama_host, model=model_name)
+    elif backend_type == "vllm":
+        from orchestrator.llm.vllm import VLLMBackend
+        llm_backend = VLLMBackend(base_url=ollama_host, model=model_name)
+    elif backend_type == "llamacpp":
+        from orchestrator.llm.llamacpp import LlamaCppBackend
+        llm_backend = LlamaCppBackend(base_url=ollama_host, model=model_name)
+    else:
+        logger.error("Unknown LLM backend type: %s", backend_type)
+        return 1
 
     # Rate limiter
     rate_config = llm_config.get("rate_limit", {})
     rate_limiter = RateLimiter(
         actions_per_minute=rate_config.get("actions_per_minute", 30),
-        burst_size=rate_config.get("burst_size", 5),
     )
 
     # Ground-truth emitter
-    ground_truth_emitter = GroundTruthEmitter(output_path=gt_output)
+    # GroundTruthEmitter reads from ATHENA_GT_OUTPUT env var
+    ground_truth_emitter = GroundTruthEmitter()
 
     # Traffic labeler
     traffic_labeler = TrafficLabeler()
