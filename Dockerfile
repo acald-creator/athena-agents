@@ -52,7 +52,7 @@ RUN cargo build --release
 # Stage 2: python-env
 # Install the Python orchestrator package into a portable prefix
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS python-env
+FROM python:3.14-slim AS python-env
 
 WORKDIR /app
 
@@ -71,7 +71,7 @@ RUN pip install --no-cache-dir --prefix=/install .
 # Stage 3: runner
 # Final minimal image - no build toolchains
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS runner
+FROM python:3.14-slim AS runner
 
 # OCI labels documenting security context requirements
 LABEL org.opencontainers.image.title="athena-agents"
