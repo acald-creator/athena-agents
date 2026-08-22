@@ -14,7 +14,7 @@
 # Compile Rust binaries as statically-linked musl binaries
 # On alpine, the default target already links against musl.
 # ---------------------------------------------------------------------------
-FROM rust:1.85-alpine AS rust-builder
+FROM rust:1.97-alpine AS rust-builder
 
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
 
