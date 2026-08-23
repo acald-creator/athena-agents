@@ -147,6 +147,24 @@ class ToolRegistry:
         """Return all registered tool identifiers."""
         return list(self._tools.keys())
 
+    def apply_defaults(self, tool_id: str, args: dict[str, Any]) -> dict[str, Any]:
+        """Return a copy of args with declared defaults filled in.
+
+        Raises
+        ------
+        ToolRegistryError
+            If the tool is not found in the registry.
+        """
+        tool = self._tools.get(tool_id)
+        if tool is None:
+            raise ToolRegistryError(f"Tool not found in registry: {tool_id}")
+
+        merged = dict(args)
+        for arg_name, arg_schema in tool.args.items():
+            if arg_name not in merged and arg_schema.default is not None:
+                merged[arg_name] = arg_schema.default
+        return merged
+
     def validate_arguments(self, tool_id: str, args: dict[str, Any]) -> None:
         """Validate arguments against a tool's declared schema.
 

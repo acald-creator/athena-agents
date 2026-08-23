@@ -10,6 +10,7 @@ Includes safety controls:
 - Max actions validation and enforcement (Req 4.6)
 - Failure handling with needs_review emission (Req 4.8)
 - Capability checking against active profile (Req 6.4, 6.6, 6.7)
+- Tool execution via the registry (subprocess + GET-only HTTP)
 - Boundary violation detection stub (Req 11.5)
 
 Requirements: 4.1, 4.2, 4.3, 4.5, 4.6, 4.7, 4.8, 6.4, 6.6, 6.7, 11.1, 11.5, 12.2, 12.3
@@ -26,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from orchestrator.allowlist import AllowlistEntry, AllowlistError, verify_allowlist
+from orchestrator.executor import execute_tool
 from orchestrator.ground_truth import GroundTruthEmitter
 from orchestrator.interfaces import (
     ActionResult,
@@ -37,7 +39,7 @@ from orchestrator.interfaces import (
 )
 from orchestrator.llm.interface import LLMBackend
 from orchestrator.rate_limiter import RateLimiter
-from orchestrator.tool_registry import ToolRegistry
+from orchestrator.tool_registry import ToolRegistry, ToolRegistryError, ToolValidationError
 from orchestrator.traffic_labeling import TrafficLabeler
 
 logger = logging.getLogger(__name__)
@@ -366,9 +368,13 @@ class AgentOrchestrator:
         Returns:
             A TargetState snapshot of the target.
         """
+        try:
+            open_ports = [self._get_target_port(target)]
+        except AllowlistError:
+            open_ports = []
         return TargetState(
             target=target,
-            open_ports=[],
+            open_ports=open_ports,
             services=[],
             timestamp=datetime.now(timezone.utc),
         )
@@ -395,6 +401,10 @@ class AgentOrchestrator:
 
         history_lines = [f"- {h.action_spec.tool_id}: {h.action_spec.rationale[:50]}" for h in history[-10:]]
         nl = chr(10)
+        try:
+            target_port = self._get_target_port(state.target)
+        except AllowlistError:
+            target_port = state.open_ports[0] if state.open_ports else 80
 
         prompt = f"""You are an autonomous security testing agent. Target: {state.target}
 {nl}Available tools:
@@ -404,7 +414,7 @@ class AgentOrchestrator:
 {nl.join(history_lines) if history_lines else '(first action)'}
 {nl}Select the next tool. Respond ONLY with JSON:
 {{"tool_id": "<tool>", "arguments": {{}}, "technique": "<ATT&CK ID or null>", "rationale": "<why>"}}
-{nl}Base URL: http://{state.target}:8090"""
+{nl}Base URL: http://{state.target}:{target_port}"""
 
         try:
             response = await self.llm_backend.generate(prompt, max_tokens=512)
@@ -438,14 +448,43 @@ class AgentOrchestrator:
             )
 
 
+    def _prepare_arguments(self, action_spec: ActionSpec) -> dict[str, Any]:
+        """Fill schema defaults and scenario target/port into planned arguments."""
+        merged = self.tool_registry.apply_defaults(action_spec.tool_id, action_spec.arguments)
+        tool = self.tool_registry.get_tool(action_spec.tool_id)
+        if tool is None:
+            return merged
+
+        target = getattr(self, "_current_target", None)
+        if target and "target" in tool.args and not merged.get("target"):
+            merged["target"] = target
+
+        try:
+            port = self._get_target_port(str(merged.get("target") or target or ""))
+        except AllowlistError:
+            port = None
+
+        if port is not None:
+            if "port" in tool.args and not merged.get("port"):
+                merged["port"] = port
+            if "start_port" in tool.args and merged.get("start_port") is None:
+                merged["start_port"] = port
+            if "end_port" in tool.args and merged.get("end_port") is None:
+                merged["end_port"] = port
+            if "url" in tool.args and not merged.get("url") and merged.get("target"):
+                path = str(merged.get("path") or "/")
+                if not path.startswith("/"):
+                    path = "/" + path
+                merged["url"] = f"http://{merged['target']}:{port}{path}"
+        return merged
+
     async def act(self, action_spec: ActionSpec) -> ActionResult:
         """Execute the planned action using the tool from the registry.
 
         Before invoking the tool, the traffic labeler produces HTTP headers
         and environment variables that label this action's traffic for SOC
-        dashboard filtering. For HTTP-based tools, the X-Athena-Scenario-Id
-        header is included in requests. For all tools, ATHENA_SCENARIO_ID
-        and ATHENA_SCENARIO_LABEL environment variables are set.
+        dashboard filtering. Arguments are validated against the registry
+        schema. HTTP probes are GET-only and must hit an allowlisted host:port.
 
         Args:
             action_spec: The action specification from the plan phase.
@@ -453,25 +492,57 @@ class AgentOrchestrator:
         Returns:
             An ActionResult describing the execution outcome.
         """
-        # Prepare traffic labeling metadata (Req 10.2, 10.4)
-        scenario_id = self._current_scenario_id
+        scenario_id = getattr(self, "_current_scenario_id", "unknown")
         label = self.scenario_label or f"scenario-{scenario_id}"
 
         http_headers = self.traffic_labeler.get_http_headers(scenario_id)
         env_vars = self.traffic_labeler.get_env_vars(scenario_id, label)
-
-        # Store for use by tool invocation infrastructure when fully wired
         self._current_http_headers = http_headers
         self._current_env_vars = env_vars
 
-        # Stub: in production, this will invoke the tool and capture output,
-        # passing http_headers for HTTP-based tools and env_vars for all tools.
-        return ActionResult(
-            success=True,
-            output={"tool_id": action_spec.tool_id, "status": "stub_executed"},
-            error=None,
-            terminal=False,
+        tool = self.tool_registry.get_tool(action_spec.tool_id)
+        if tool is None:
+            return ActionResult(
+                success=False,
+                output={"tool_id": action_spec.tool_id, "status": "rejected", "reason": "unknown_tool"},
+                error=f"Tool not found in registry: {action_spec.tool_id}",
+                terminal=False,
+            )
+
+        try:
+            arguments = self._prepare_arguments(action_spec)
+            self.tool_registry.validate_arguments(action_spec.tool_id, arguments)
+        except (ToolValidationError, ToolRegistryError) as exc:
+            return ActionResult(
+                success=False,
+                output={"tool_id": action_spec.tool_id, "status": "rejected", "reason": "invalid_arguments"},
+                error=str(exc),
+                terminal=False,
+            )
+
+        default_target = getattr(self, "_current_target", "")
+        try:
+            default_port = self._get_target_port(default_target) if default_target else 80
+        except AllowlistError:
+            default_port = 80
+
+        result = await execute_tool(
+            action_spec.tool_id,
+            tool,
+            arguments,
+            allowlist=self._allowlist,
+            default_target=default_target,
+            default_port=default_port,
+            env=env_vars,
+            headers=http_headers,
         )
+        logger.info(
+            "Act %s: status=%s success=%s",
+            action_spec.tool_id,
+            result.output.get("status"),
+            result.success,
+        )
+        return result
 
     async def reflect(self, action_spec: ActionSpec, result: ActionResult) -> ReflectSummary:
         """Evaluate the action result and produce a reflect summary.

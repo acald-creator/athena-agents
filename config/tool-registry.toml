@@ -42,11 +42,23 @@ payload = { type = "string", required = true }
 executable = "/usr/bin/nmap"
 invocation = "subprocess"
 required_capabilities = []
-description = "Nmap network scanner"
+description = "Nmap connect scan of allowlisted ports"
 
 [tools.nmap-scan.args]
 target = { type = "string", required = true }
 flags = { type = "string", required = false, default = "-sT" }
+
+[tools.http-request]
+module = "orchestrator.tools.http_request"
+invocation = "in-process"
+required_capabilities = []
+description = "GET an allowlisted HTTP path (labeled traffic, no request body)"
+
+[tools.http-request.args]
+target = { type = "string", required = true }
+port = { type = "integer", required = true, min = 1, max = 65535 }
+path = { type = "string", required = false, default = "/" }
+url = { type = "string", required = false }
 
 [tools.scapy-craft]
 module = "orchestrator.tools.scapy_craft"

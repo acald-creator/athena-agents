@@ -52,7 +52,7 @@ def _create_allowlist_file(tmp_path: Path, host: str = "127.0.0.1", port_start: 
 def _create_tool_registry() -> ToolRegistry:
     """Create a minimal ToolRegistry for testing."""
     tool_entry = ToolEntry(
-        executable="/usr/bin/nmap",
+        executable="/usr/bin/true",
         invocation="subprocess",
         required_capabilities=[],
         description="Test scanner",

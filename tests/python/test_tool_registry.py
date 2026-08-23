@@ -228,6 +228,21 @@ class TestArgumentValidation:
         with pytest.raises(ToolRegistryError, match="Tool not found"):
             registry.validate_arguments("ghost-tool", {"x": 1})
 
+    def test_apply_defaults_fills_optional_values(self, registry: ToolRegistry) -> None:
+        """apply_defaults copies declared defaults without mutating the input."""
+        original = {"target": "192.168.1.1", "start_port": 1, "end_port": 1024}
+        merged = registry.apply_defaults("port-scanner", original)
+        assert merged["concurrency"] == 1024
+        assert "concurrency" not in original
+
+    def test_apply_defaults_does_not_overwrite_provided(self, registry: ToolRegistry) -> None:
+        """An explicit value wins over the schema default."""
+        merged = registry.apply_defaults(
+            "port-scanner",
+            {"target": "192.168.1.1", "start_port": 1, "end_port": 1024, "concurrency": 8},
+        )
+        assert merged["concurrency"] == 8
+
 
 # ---------------------------------------------------------------------------
 # Environment variable expansion tests
@@ -335,4 +350,5 @@ class TestRealConfig:
         assert "protocol-fuzzer" in tools
         assert "packet-crafter" in tools
         assert "nmap-scan" in tools
+        assert "http-request" in tools
         assert "scapy-craft" in tools

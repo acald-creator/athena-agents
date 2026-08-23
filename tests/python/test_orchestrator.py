@@ -81,7 +81,7 @@ def _create_mock_llm_backend() -> MagicMock:
 def _create_tool_registry() -> ToolRegistry:
     """Create a minimal ToolRegistry for testing."""
     tool_entry = ToolEntry(
-        executable="/usr/bin/nmap",
+        executable="/usr/bin/true",
         invocation="subprocess",
         required_capabilities=[],
         description="Test scanner",
@@ -93,24 +93,24 @@ def _create_tool_registry() -> ToolRegistry:
 def _create_tool_registry_with_capabilities() -> ToolRegistry:
     """Create a ToolRegistry with tools that require capabilities."""
     scanner = ToolEntry(
-        executable="/usr/bin/nmap",
+        executable="/usr/bin/true",
         invocation="subprocess",
         required_capabilities=[],
         description="Test scanner (no caps needed)",
         args={},
     )
     crafter = ToolEntry(
-        executable="/usr/local/bin/athena-crafter",
+        executable="/usr/bin/true",
         invocation="subprocess",
         required_capabilities=["NET_RAW"],
         description="Packet crafter (needs NET_RAW)",
         args={},
     )
     exploit_tool = ToolEntry(
-        executable="/usr/local/bin/exploit-runner",
+        executable="/usr/bin/true",
         invocation="subprocess",
         required_capabilities=["NET_RAW", "SYS_PTRACE"],
-        description="Exploit runner (needs NET_RAW + SYS_PTRACE)",
+        description="Capability-gated test tool (needs NET_RAW + SYS_PTRACE)",
         args={},
     )
     return ToolRegistry({
@@ -298,7 +298,7 @@ class TestGroundTruthEmission:
         gt_output_path: Path = orchestrator_deps["gt_output_path"]
         lines = gt_output_path.read_text().strip().split("\n")
         record = json.loads(lines[0])
-        # Default stub act() returns success=True, terminal=False
+        # Successful non-terminal act() is labeled 'malicious'
         assert record["label"] == "malicious"
 
 

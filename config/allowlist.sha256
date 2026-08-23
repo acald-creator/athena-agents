@@ -1,18 +1,1 @@
-# SHA-256 integrity hash for config/allowlist.json
-#
-# The orchestrator's verify_allowlist() function computes the SHA-256 digest
-# of allowlist.json at runtime and compares it against the expected hash below.
-# If the hashes do not match, execution is refused (AllowlistError raised).
-#
-# Mechanism:
-#   1. Read the raw bytes of config/allowlist.json
-#   2. Compute SHA-256 of those bytes
-#   3. Compare the hex digest against the expected_hash parameter
-#   4. Reject if mismatch (detects tampering or accidental edits)
-#
-# To regenerate after modifying allowlist.json:
-#   shasum -a 256 config/allowlist.json | awk '{print $1}' > config/allowlist.sha256.tmp
-#   # Then update the hash value below
-#
-# Expected hash (hex digest):
-5ce98591570125a7f974c921a8373f407002e3e6a3bfa3a050db69824dea7ea7
+73ae882e5d5572397aea3a97465ea0040645c97d984018a096686d2df03062f2

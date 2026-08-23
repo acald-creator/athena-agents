@@ -1,0 +1,10 @@
+# Grimoire workbench API — host cargo process
+# Schema matches other athena-agents target files.
+
+[target]
+id = "grimoire"
+host = "127.0.0.1"
+port = 3010
+protocol = "http"
+base_path = "/api"
+timeout_seconds = 5

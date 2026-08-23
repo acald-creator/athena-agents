@@ -1,0 +1,9 @@
+# Grimoire workbench API — compose hostname on athena_lab
+
+[target]
+id = "grimoire-lab"
+host = "grimoire.lab"
+port = 3000
+protocol = "http"
+base_path = "/api"
+timeout_seconds = 5

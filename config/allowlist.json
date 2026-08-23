@@ -1,4 +1,6 @@
 [
   {"host": "juice-shop.lab.local", "port_range": [3000, 3000], "protocol": "http", "label": "juice-shop-lab"},
-  {"host": "dvwa.lab.local", "port_range": [80, 80], "protocol": "http", "label": "dvwa-lab"}
+  {"host": "dvwa.lab.local", "port_range": [80, 80], "protocol": "http", "label": "dvwa-lab"},
+  {"host": "127.0.0.1", "port_range": [3010, 3010], "protocol": "http", "label": "grimoire-host"},
+  {"host": "grimoire.lab", "port_range": [3000, 3000], "protocol": "http", "label": "grimoire-lab"}
 ]
