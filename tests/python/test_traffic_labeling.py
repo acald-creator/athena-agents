@@ -21,9 +21,21 @@ class TestTrafficLabelerHTTPHeaders:
     def test_includes_scenario_id_header(self):
         """Headers must include X-Athena-Scenario-Id with the scenario_id value."""
         labeler = TrafficLabeler()
-        headers = labeler.get_http_headers("abc-def-456")
+        headers = labeler.get_http_headers("abc-def-456", label="night-quire")
         assert "X-Athena-Scenario-Id" in headers
         assert headers["X-Athena-Scenario-Id"] == "abc-def-456"
+
+    def test_includes_scenario_label_header(self):
+        labeler = TrafficLabeler()
+        headers = labeler.get_http_headers("abc-def-456", label="night-quire")
+        assert headers["X-Athena-Scenario"] == "night-quire"
+
+    def test_includes_run_id_when_provided(self):
+        labeler = TrafficLabeler()
+        headers = labeler.get_http_headers(
+            "abc-def-456", label="night-quire", run_id="run-1"
+        )
+        assert headers["X-Athena-Run-ID"] == "run-1"
 
     def test_scenario_id_header_matches_input(self):
         """The X-Athena-Scenario-Id header value must match the scenario_id argument."""
@@ -31,12 +43,14 @@ class TestTrafficLabelerHTTPHeaders:
         scenario_id = "550e8400-e29b-41d4-a716-446655440000"
         headers = labeler.get_http_headers(scenario_id)
         assert headers["X-Athena-Scenario-Id"] == scenario_id
+        assert headers["X-Athena-Scenario"] == scenario_id
 
     def test_empty_scenario_id(self):
         """An empty scenario_id should still produce a header with empty value."""
         labeler = TrafficLabeler()
         headers = labeler.get_http_headers("")
         assert headers["X-Athena-Scenario-Id"] == ""
+        assert headers["X-Athena-Scenario"] == ""
 
     def test_uuid_format_scenario_id(self):
         """UUID-formatted scenario IDs should be returned verbatim."""
@@ -98,9 +112,11 @@ class TestTrafficLabelerConsistency:
         """The scenario_id should appear in both headers and env vars."""
         labeler = TrafficLabeler()
         scenario_id = "consistent-test-id"
-        headers = labeler.get_http_headers(scenario_id)
-        env_vars = labeler.get_env_vars(scenario_id, "test-label")
+        headers = labeler.get_http_headers(scenario_id, label="test-label")
+        env_vars = labeler.get_env_vars(scenario_id, "test-label", run_id="run-42")
         assert headers["X-Athena-Scenario-Id"] == env_vars["ATHENA_SCENARIO_ID"]
+        assert headers["X-Athena-Scenario"] == env_vars["ATHENA_SCENARIO_LABEL"]
+        assert env_vars["ATHENA_RUN_ID"] == "run-42"
 
     def test_multiple_calls_same_result(self):
         """Calling the same method multiple times with same input returns same result."""

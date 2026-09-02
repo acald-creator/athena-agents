@@ -15,6 +15,8 @@ import sys
 import time
 from pathlib import Path
 
+from orchestrator.target_config import load_target_document, load_toml
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,17 +36,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to configuration directory",
     )
     return parser.parse_args()
-
-
-def load_toml(path: Path) -> dict:
-    """Load a TOML file. Uses tomllib (3.11+) or tomli as fallback."""
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib
-
-    with open(path, "rb") as f:
-        return tomllib.load(f)
 
 
 async def check_llm_health(url: str, retries: int = 3) -> bool:
@@ -93,14 +84,26 @@ async def run(args: argparse.Namespace) -> int:
     llm_config = load_toml(llm_config_path) if llm_config_path.exists() else {}
     ollama_host = os.environ.get("OLLAMA_HOST", llm_config.get("backend", {}).get("url", "http://localhost:11434"))
 
-    # Load target config
-    target_config = load_toml(target_config_path)
-    logger.info("Loaded target config: %s (host=%s, port=%s)",
-                target_name, target_config.get("host"), target_config.get("port"))
+    # Load target config ([target] table or legacy flat schema)
+    target_doc = load_target_document(target_config_path)
+    target_host = target_doc.get("host")
+    target_port = target_doc.get("port")
+    logger.info(
+        "Loaded target config: %s (host=%s, port=%s)",
+        target_name,
+        target_host,
+        target_port,
+    )
+
+    if not target_host:
+        logger.error("Target config missing host: %s", target_config_path)
+        return 1
 
     # Verify allowlist integrity
     import hashlib
     import json
+
+    from orchestrator.allowlist import is_target_allowed
 
     allowlist_data = allowlist_path.read_bytes()
     actual_hash = hashlib.sha256(allowlist_data).hexdigest()
@@ -116,11 +119,17 @@ async def run(args: argparse.Namespace) -> int:
     allowlist = json.loads(allowlist_data)
     logger.info("Allowlist verified: %d entries", len(allowlist))
 
-    # Verify target is in allowlist
-    target_host = target_config.get("host")
+    # Verify target host is in allowlist (port checked when configured)
     if not any(entry.get("host") == target_host for entry in allowlist):
-        logger.error("Target %s not in allowlist", target_host)
+        logger.error("Target host %s not in allowlist", target_host)
         return 1
+    if target_port is not None:
+        from orchestrator.allowlist import AllowlistEntry, verify_allowlist
+
+        entries = verify_allowlist(allowlist_path, expected_hash)
+        if not is_target_allowed(str(target_host), int(target_port), entries):
+            logger.error("Target %s:%s not in allowlist port ranges", target_host, target_port)
+            return 1
 
     # Check LLM backend health
     if not await check_llm_health(ollama_host):
@@ -179,10 +188,20 @@ async def run(args: argparse.Namespace) -> int:
     # Traffic labeler
     traffic_labeler = TrafficLabeler()
 
-    # Scenario config
+    scenario_cfg = target_doc.get("scenario", {})
+    api_cfg = target_doc.get("api", {})
+    note_parts = []
+    if scenario_cfg.get("objective"):
+        note_parts.append(str(scenario_cfg["objective"]))
+    public_endpoints = api_cfg.get("public_endpoints") or []
+    if public_endpoints:
+        note_parts.append("Public endpoints: " + ", ".join(str(e) for e in public_endpoints))
+
     scenario = ScenarioConfig(
-        target=target_host,
-        max_actions=target_config.get("scenario", {}).get("max_actions", 100),
+        target=str(target_host),
+        target_port=int(target_port) if target_port is not None else None,
+        max_actions=int(scenario_cfg.get("max_actions", 100)),
+        planner_notes="\n".join(note_parts),
     )
 
     # Build orchestrator
@@ -200,10 +219,15 @@ async def run(args: argparse.Namespace) -> int:
 
     # Verify allowlist (redundant but required by the orchestrator API)
     orchestrator.verify_allowlist_integrity()
-    orchestrator.validate_target(target_host)
+    orchestrator.validate_target(str(target_host))
 
     # Run scenario
-    logger.info("Starting OPAR scenario: target=%s, max_actions=%d", target_host, scenario.max_actions)
+    logger.info(
+        "Starting OPAR scenario: target=%s:%s, max_actions=%d",
+        target_host,
+        target_port or "auto",
+        scenario.max_actions,
+    )
     start_time = time.time()
 
     result = await orchestrator.run_scenario(scenario)

@@ -81,7 +81,7 @@ All autonomous execution enforces:
 | Capability gates | Tools declare required caps; only available if active profile provides them |
 | Rate limiting | Per-target token-bucket (configured in target TOML) |
 | Safe ranges | ICS write values validated against min/max before network transmission |
-| Traffic labeling | `X-Athena-Scenario` + `X-Athena-Run-ID` on all outbound requests |
+| Traffic labeling | `X-Athena-Scenario`, `X-Athena-Scenario-Id`, `X-Athena-Run-ID` on outbound HTTP |
 | Human review | `needs_review` flag halts execution for analyst approval |
 | Max actions | Configurable limit (1-1000) prevents runaway |
 

@@ -17,62 +17,52 @@ class TrafficLabeler:
     traffic so that SOC dashboards can distinguish training/simulation traffic
     from real alerts.
 
-    The labeler provides two outputs:
-    - HTTP headers (for HTTP-based attack tools): includes `X-Athena-Scenario-Id`
-    - Environment variables (for tool invocations): includes `ATHENA_SCENARIO_ID`
-      and `ATHENA_SCENARIO_LABEL`
+    HTTP headers (aligned with core-nexus ai-inference / gateway):
+    - ``X-Athena-Scenario``: human-readable scenario label (SOC filter)
+    - ``X-Athena-Scenario-Id``: unique scenario run identifier
+    - ``X-Athena-Run-ID``: OPAR run identifier
 
-    Example usage::
-
-        labeler = TrafficLabeler()
-        headers = labeler.get_http_headers("scenario-abc-123")
-        env_vars = labeler.get_env_vars("scenario-abc-123", "sqli-juice-shop")
-
+    Environment variables (tool subprocesses):
+    - ``ATHENA_SCENARIO_ID``, ``ATHENA_SCENARIO_LABEL``, ``ATHENA_RUN_ID``
     """
 
-    #: Header name used to tag HTTP-based attack traffic with the scenario ID.
+    SCENARIO_HEADER = "X-Athena-Scenario"
     SCENARIO_ID_HEADER = "X-Athena-Scenario-Id"
+    RUN_ID_HEADER = "X-Athena-Run-ID"
 
-    #: Environment variable name for the scenario ID passed to tool invocations.
     SCENARIO_ID_ENV = "ATHENA_SCENARIO_ID"
-
-    #: Environment variable name for the scenario label passed to tool invocations.
     SCENARIO_LABEL_ENV = "ATHENA_SCENARIO_LABEL"
+    RUN_ID_ENV = "ATHENA_RUN_ID"
 
-    def get_http_headers(self, scenario_id: str) -> dict[str, str]:
-        """Return HTTP headers to attach to HTTP-based attack traffic.
-
-        These headers allow SOC sensors and dashboards to identify which
-        scenario generated a given piece of network traffic.
-
-        Args:
-            scenario_id: The unique identifier of the running scenario.
-
-        Returns:
-            A dictionary of header name to header value. Currently includes
-            the ``X-Athena-Scenario-Id`` header.
-        """
-        return {
+    def get_http_headers(
+        self,
+        scenario_id: str,
+        *,
+        label: str = "",
+        run_id: str = "",
+    ) -> dict[str, str]:
+        """Return HTTP headers for labeled attack traffic."""
+        scenario_label = label or scenario_id
+        headers = {
             self.SCENARIO_ID_HEADER: scenario_id,
+            self.SCENARIO_HEADER: scenario_label,
         }
+        if run_id:
+            headers[self.RUN_ID_HEADER] = run_id
+        return headers
 
-    def get_env_vars(self, scenario_id: str, label: str) -> dict[str, str]:
-        """Return environment variables to set for tool invocations.
-
-        These environment variables are injected into the subprocess or
-        in-process tool environment so that any downstream telemetry or
-        logging can carry the scenario context.
-
-        Args:
-            scenario_id: The unique identifier of the running scenario.
-            label: A descriptive label for the scenario (e.g., "sqli-juice-shop",
-                "xss-dvwa"). Used by SOC dashboards to filter training traffic.
-
-        Returns:
-            A dictionary of environment variable name to value. Includes
-            ``ATHENA_SCENARIO_ID`` and ``ATHENA_SCENARIO_LABEL``.
-        """
-        return {
+    def get_env_vars(
+        self,
+        scenario_id: str,
+        label: str,
+        *,
+        run_id: str = "",
+    ) -> dict[str, str]:
+        """Return environment variables for tool invocations."""
+        env = {
             self.SCENARIO_ID_ENV: scenario_id,
             self.SCENARIO_LABEL_ENV: label,
         }
+        if run_id:
+            env[self.RUN_ID_ENV] = run_id
+        return env

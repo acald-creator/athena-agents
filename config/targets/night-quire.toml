@@ -1,0 +1,27 @@
+# Night Quire — reader/author novel platform (Go API + SvelteKit)
+# Host run: API on 127.0.0.1:8090, web on :5173 (use explicit target_port in allowlist).
+
+[target]
+id = "night-quire"
+host = "127.0.0.1"
+port = 8090
+protocol = "http"
+base_path = "/"
+timeout_seconds = 10
+
+[scenario]
+objective = "Reconnaissance and auth-surface mapping on Night Quire public API (purple range target)."
+max_actions = 8
+
+[api]
+base_path = "/api/v1"
+public_endpoints = [
+  "GET /health",
+  "GET /api/v1/novels",
+  "GET /api/v1/novels/{id}",
+  "GET /api/v1/novels/{id}/chapters/{num}",
+  "GET /api/v1/search",
+  "GET /api/v1/home",
+  "GET /api/v1/genres",
+  "GET /api/v1/authors/{slug}",
+]

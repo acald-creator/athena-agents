@@ -78,12 +78,16 @@ class ScenarioConfig:
         max_actions: Maximum number of actions before the loop halts (1-1000).
         scenario_id: UUID identifying this scenario definition.
         run_id: UUID identifying this particular execution run.
+        planner_notes: Optional target-specific notes injected into the plan prompt
+            (objective, public endpoints). Must not contain secrets.
     """
 
     target: str
     max_actions: int = 100
+    target_port: int | None = None
     scenario_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     run_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    planner_notes: str = ""
 
 
 @dataclass
@@ -177,6 +181,7 @@ class AgentOrchestrator:
         self.scenario_label = scenario_label
         self.action_history: list[ReflectSummary] = []
         self._allowlist: list[AllowlistEntry] = []
+        self._planner_notes: str = ""
 
     def verify_allowlist_integrity(self) -> None:
         """Verify the allowlist file integrity via SHA-256 hash comparison.
@@ -206,6 +211,13 @@ class AgentOrchestrator:
             if entry.host == target:
                 return
         raise AllowlistError(f"Target not in allowlist: {target}")
+
+    def _resolve_target_port(self, target: str) -> int:
+        """Return explicit scenario port or the first allowlisted port for host."""
+        explicit = getattr(self, "_current_target_port", None)
+        if explicit is not None:
+            return int(explicit)
+        return self._get_target_port(target)
 
     def _get_target_port(self, target: str) -> int:
         """Get the first port from the allowlist entry for the target.
@@ -369,7 +381,7 @@ class AgentOrchestrator:
             A TargetState snapshot of the target.
         """
         try:
-            open_ports = [self._get_target_port(target)]
+            open_ports = [self._resolve_target_port(target)]
         except AllowlistError:
             open_ports = []
         return TargetState(
@@ -402,10 +414,11 @@ class AgentOrchestrator:
         history_lines = [f"- {h.action_spec.tool_id}: {h.action_spec.rationale[:50]}" for h in history[-10:]]
         nl = chr(10)
         try:
-            target_port = self._get_target_port(state.target)
+            target_port = self._resolve_target_port(state.target)
         except AllowlistError:
             target_port = state.open_ports[0] if state.open_ports else 80
 
+        notes_block = f"{nl}Notes:{nl}{self._planner_notes}" if self._planner_notes else ""
         prompt = f"""You are an autonomous security testing agent. Target: {state.target}
 {nl}Available tools:
 {nl.join(tool_descs)}
@@ -414,7 +427,7 @@ class AgentOrchestrator:
 {nl.join(history_lines) if history_lines else '(first action)'}
 {nl}Select the next tool. Respond ONLY with JSON:
 {{"tool_id": "<tool>", "arguments": {{}}, "technique": "<ATT&CK ID or null>", "rationale": "<why>"}}
-{nl}Base URL: http://{state.target}:{target_port}"""
+{nl}Base URL: http://{state.target}:{target_port}{notes_block}"""
 
         try:
             response = await self.llm_backend.generate(prompt, max_tokens=512)
@@ -460,7 +473,7 @@ class AgentOrchestrator:
             merged["target"] = target
 
         try:
-            port = self._get_target_port(str(merged.get("target") or target or ""))
+            port = self._resolve_target_port(str(merged.get("target") or target or ""))
         except AllowlistError:
             port = None
 
@@ -495,8 +508,12 @@ class AgentOrchestrator:
         scenario_id = getattr(self, "_current_scenario_id", "unknown")
         label = self.scenario_label or f"scenario-{scenario_id}"
 
-        http_headers = self.traffic_labeler.get_http_headers(scenario_id)
-        env_vars = self.traffic_labeler.get_env_vars(scenario_id, label)
+        run_id = getattr(self, "_current_run_id", "")
+
+        http_headers = self.traffic_labeler.get_http_headers(
+            scenario_id, label=label, run_id=run_id
+        )
+        env_vars = self.traffic_labeler.get_env_vars(scenario_id, label, run_id=run_id)
         self._current_http_headers = http_headers
         self._current_env_vars = env_vars
 
@@ -522,7 +539,7 @@ class AgentOrchestrator:
 
         default_target = getattr(self, "_current_target", "")
         try:
-            default_port = self._get_target_port(default_target) if default_target else 80
+            default_port = self._resolve_target_port(default_target) if default_target else 80
         except AllowlistError:
             default_port = 80
 
@@ -665,6 +682,8 @@ class AgentOrchestrator:
         self._current_scenario_id = scenario.scenario_id
         self._current_run_id = scenario.run_id
         self._current_target = scenario.target
+        self._current_target_port = scenario.target_port
+        self._planner_notes = scenario.planner_notes
 
         # Reset action history for this scenario
         self.action_history = []
@@ -674,7 +693,7 @@ class AgentOrchestrator:
         self.validate_target(scenario.target)
 
         # Target reachability check (Req 12.2, 12.3)
-        target_port = self._get_target_port(scenario.target)
+        target_port = self._resolve_target_port(scenario.target)
         try:
             await self.verify_target_reachable(scenario.target, target_port)
         except TargetUnreachableError as exc:

@@ -1,10 +1,10 @@
-# Grimoire workbench API — host cargo process
+# Grimoire workbench UI — host SvelteKit on :4400 (proxies /api to cargo :3010)
 # Schema matches other athena-agents target files.
 
 [target]
 id = "grimoire"
 host = "127.0.0.1"
-port = 3010
+port = 4400
 protocol = "http"
-base_path = "/api"
+base_path = "/"
 timeout_seconds = 5
