@@ -60,6 +60,19 @@ port = { type = "integer", required = true, min = 1, max = 65535 }
 path = { type = "string", required = false, default = "/" }
 url = { type = "string", required = false }
 
+[tools.http-post-probe]
+module = "orchestrator.tools.http_post_probe"
+invocation = "in-process"
+required_capabilities = []
+description = "POST JSON to allowlisted auth paths (labeled traffic, path-gated)"
+
+[tools.http-post-probe.args]
+target = { type = "string", required = true }
+port = { type = "integer", required = true, min = 1, max = 65535 }
+path = { type = "string", required = true }
+body = { type = "object", required = true }
+url = { type = "string", required = false }
+
 [tools.scapy-craft]
 module = "orchestrator.tools.scapy_craft"
 invocation = "in-process"

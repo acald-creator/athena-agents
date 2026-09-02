@@ -172,7 +172,7 @@ async def execute_tool(
 ) -> ActionResult:
     """Dispatch a validated action to the matching invocation path."""
     host = str(arguments.get("target") or default_target)
-    if "target" in arguments or tool_id in {"nmap-scan", "http-request", "port-scanner"}:
+    if "target" in arguments or tool_id in {"nmap-scan", "http-request", "http-post-probe", "port-scanner"}:
         if not any(entry.host == host for entry in allowlist):
             return ActionResult(
                 success=False,
@@ -183,6 +183,19 @@ async def execute_tool(
 
     if tool_id == "http-request":
         result = await http_request.run(
+            arguments,
+            default_target=default_target,
+            default_port=default_port,
+            allowlist=allowlist,
+            headers=headers,
+            timeout=min(timeout, 10.0),
+        )
+        return result
+
+    if tool_id == "http-post-probe":
+        from orchestrator.tools import http_post_probe
+
+        result = await http_post_probe.run(
             arguments,
             default_target=default_target,
             default_port=default_port,
