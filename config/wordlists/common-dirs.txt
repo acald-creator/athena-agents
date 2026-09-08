@@ -1,0 +1,24 @@
+# Lab directory wordlist for Athena dir-bruteforce (max 64 used at runtime).
+admin
+api
+assets
+backup
+config
+console
+ftp
+hidden
+login
+metrics
+rest
+robots.txt
+sitemap.xml
+vendor
+upload
+uploads
+swagger
+graphql
+health
+status
+.git
+.env
+wp-admin

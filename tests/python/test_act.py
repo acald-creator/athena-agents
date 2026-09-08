@@ -278,3 +278,98 @@ class TestOrchestratorAct:
         assert result.output["status"] == "executed"
         assert result.output["url"] == "http://127.0.0.1:3010/"
         assert "stub_executed" not in result.output.values()
+
+
+def _dir_brute_tool() -> ToolEntry:
+    return ToolEntry(
+        module="orchestrator.tools.dir_bruteforce",
+        invocation="in-process",
+        required_capabilities=[],
+        description="dir brute",
+        args={
+            "target": ToolArg(type="string", required=True),
+            "port": ToolArg(type="integer", required=True, min=1, max=65535),
+            "wordlist": ToolArg(type="string", required=False),
+            "concurrency": ToolArg(type="integer", required=False, default=4, min=1, max=8),
+            "max_entries": ToolArg(type="integer", required=False, default=64, min=1, max=64),
+        },
+    )
+
+
+class TestDirBruteforce:
+    def test_load_wordlist_builtin_clamped(self) -> None:
+        from orchestrator.tools.dir_bruteforce import load_wordlist
+
+        words = load_wordlist(None, max_entries=5)
+        assert len(words) == 5
+        assert "admin" in words
+
+    def test_load_wordlist_rejects_traversal_tokens(self, tmp_path: Path) -> None:
+        from orchestrator.tools.dir_bruteforce import load_wordlist
+
+        wl = tmp_path / "words.txt"
+        wl.write_text("../etc\nadmin\nbad/path\napi\n", encoding="utf-8")
+        words = load_wordlist(str(wl), max_entries=64)
+        assert words == ["admin", "api"]
+
+    def test_load_wordlist_missing_file(self) -> None:
+        from orchestrator.tools.dir_bruteforce import DirBruteError, load_wordlist
+
+        with pytest.raises(DirBruteError, match="not found"):
+            load_wordlist("/no/such/wordlist.txt")
+
+    async def test_execute_probes_and_reports_hits(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/admin":
+                return httpx.Response(200, text="ok", request=request)
+            if request.url.path == "/hidden":
+                return httpx.Response(403, text="no", request=request)
+            return httpx.Response(404, text="missing", request=request)
+
+        transport = httpx.MockTransport(handler)
+        real_client = httpx.AsyncClient(transport=transport, follow_redirects=False)
+
+        with patch("orchestrator.tools.dir_bruteforce.httpx.AsyncClient") as client_cls:
+            client = AsyncMock()
+            client.get = real_client.get
+            client.__aenter__ = AsyncMock(return_value=real_client)
+            client.__aexit__ = AsyncMock(return_value=None)
+            client_cls.return_value = client
+
+            result = await execute_tool(
+                "dir-bruteforce",
+                _dir_brute_tool(),
+                {
+                    "target": "127.0.0.1",
+                    "port": 3010,
+                    "words": ["admin", "hidden", "missing"],
+                    "max_entries": 8,
+                    "concurrency": 2,
+                },
+                allowlist=_allowlist(),
+                default_target="127.0.0.1",
+                default_port=3010,
+                env={},
+                headers={"X-Athena-Scenario": "day23"},
+            )
+            await real_client.aclose()
+
+        assert result.success is True
+        assert result.output["status"] == "executed"
+        assert result.output["probed"] == 3
+        paths = {hit["path"] for hit in result.output["hits"]}
+        assert paths == {"/admin", "/hidden"}
+
+    async def test_rejects_off_allowlist(self) -> None:
+        result = await execute_tool(
+            "dir-bruteforce",
+            _dir_brute_tool(),
+            {"target": "8.8.8.8", "port": 80},
+            allowlist=_allowlist(),
+            default_target="127.0.0.1",
+            default_port=3010,
+            env={},
+            headers={},
+        )
+        assert result.success is False
+        assert result.output["status"] == "rejected"

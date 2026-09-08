@@ -73,6 +73,20 @@ path = { type = "string", required = true }
 body = { type = "object", required = true }
 url = { type = "string", required = false }
 
+# Day 23 — gobuster/ffuf-style directory discovery (in-process, labeled, clamped).
+[tools.dir-bruteforce]
+module = "orchestrator.tools.dir_bruteforce"
+invocation = "in-process"
+required_capabilities = []
+description = "Directory brute-force (gobuster-style) against allowlisted HTTP origin"
+
+[tools.dir-bruteforce.args]
+target = { type = "string", required = true }
+port = { type = "integer", required = true, min = 1, max = 65535 }
+wordlist = { type = "string", required = false }
+concurrency = { type = "integer", required = false, default = 4, min = 1, max = 8 }
+max_entries = { type = "integer", required = false, default = 64, min = 1, max = 64 }
+
 [tools.scapy-craft]
 module = "orchestrator.tools.scapy_craft"
 invocation = "in-process"

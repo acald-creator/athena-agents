@@ -30,7 +30,8 @@ Aligned with the [100 Days of Underground Nexus](../core-nexus/docs/100-days-cha
 
 ## Phase 2: Detection Engineering (Days 21-40)
 
-- [ ] Add tool wrappers for common Kali tools (gobuster, nikto, sqlmap)
+- [x] Add directory brute-force tool (`dir-bruteforce`, gobuster-style in-process) — Day 23
+- [ ] Add tool wrappers for remaining Kali tools (nikto, sqlmap)
 - [ ] Add Suricata rule trigger tracking (which actions generate alerts)
 - [ ] Emit MITRE ATT&CK technique IDs in ground-truth records
 - [ ] Add detection coverage metric (% of actions that triggered SOC alerts)

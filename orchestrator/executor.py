@@ -1,8 +1,8 @@
 """Execute registered tools from the Act phase.
 
-Subprocess tools receive ``--arg-name value`` flags. HTTP probes are handled
-in-process and are GET-only. nmap is constrained to a connect scan of
-allowlisted ports.
+Subprocess tools receive ``--arg-name value`` flags. HTTP probes and
+directory brute-force are handled in-process (labeled GET traffic). nmap is
+constrained to a connect scan of allowlisted ports.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from typing import Any
 from orchestrator.allowlist import AllowlistEntry, is_target_allowed
 from orchestrator.interfaces import ActionResult
 from orchestrator.tool_registry import ToolEntry
-from orchestrator.tools import http_request
+from orchestrator.tools import dir_bruteforce, http_request
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +172,13 @@ async def execute_tool(
 ) -> ActionResult:
     """Dispatch a validated action to the matching invocation path."""
     host = str(arguments.get("target") or default_target)
-    if "target" in arguments or tool_id in {"nmap-scan", "http-request", "http-post-probe", "port-scanner"}:
+    if "target" in arguments or tool_id in {
+        "nmap-scan",
+        "http-request",
+        "http-post-probe",
+        "dir-bruteforce",
+        "port-scanner",
+    }:
         if not any(entry.host == host for entry in allowlist):
             return ActionResult(
                 success=False,
@@ -202,6 +208,18 @@ async def execute_tool(
             allowlist=allowlist,
             headers=headers,
             timeout=min(timeout, 10.0),
+        )
+        return result
+
+    if tool_id == "dir-bruteforce":
+        # High-volume labeled GETs — allow longer wall clock than single probes.
+        result = await dir_bruteforce.run(
+            arguments,
+            default_target=default_target,
+            default_port=default_port,
+            allowlist=allowlist,
+            headers=headers,
+            timeout=min(timeout, 5.0),
         )
         return result
 
